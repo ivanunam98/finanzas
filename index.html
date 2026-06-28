@@ -197,7 +197,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="field"><label>Categoría</label><select id="f-cat" onchange="onCatChange()"><option value="">Selecciona tipo primero…</option></select>
     <div class="err-msg" id="err-cat">Selecciona una categoría</div></div>
   <div class="field"><label>Concepto</label><select id="f-conc"><option value="">Selecciona categoría…</option></select>
-    <div class="err-msg" id="err-conc">Selecciona un concepto</div></div>
+    <input type="text" id="f-conc-custom" placeholder="O escribe un concepto nuevo…" style="margin-top:6px;width:100%;padding:10px 13px;border:1.5px solid var(--divider);border-radius:10px;font-size:14px;background:white;color:var(--ink)" oninput="onConcCustomInput()">
+    <div class="err-msg" id="err-conc">Selecciona o escribe un concepto</div></div>
   <div class="field"><label>Monto</label><input type="number" inputmode="decimal" id="f-monto" placeholder="0.00" min="0.01" step="0.01">
     <div class="err-msg" id="err-monto">Ingresa un monto válido mayor a 0</div></div>
   <div class="field"><label>Comentarios <span style="font-weight:400;text-transform:none;font-size:10px">(opcional)</span></label>
@@ -396,11 +397,37 @@ const R = {
 
 // ================================================================
 // CATÁLOGOS
+// CAT_DEFAULT: solo se usa durante la carga inicial del SEED cuando
+// Firebase está vacío. Después, dynCat es la única fuente de verdad.
 // ================================================================
-const CAT = {
+const CAT_DEFAULT = {
   Ingreso:{'Nómina':['Salario','Bono','Préstamo','Utilidades','Aguinaldo','Caja de ahorro','Fondo de ahorro','Prima'],'Acreedores':['Emilio','Gustavo','Lola','Lucy']},
   Gasto:{'Apoyo':['Mamá'],'Básicos':['Despensa1','Despensa2','Despensa3','Despensa4','Gasolina','Renta'],'Deuda':['Pago TDC1','Pago TDC2','Pago TDC','Pago WM','Préstamo'],'Entretenimiento':['Ocio1','Ocio2','Ocio3','Ocio4','Six Flags','Xbox'],'Escuela':['Colegiatura','Inscripción','Uniformes','Útiles'],'Evento':['Cumpleaños','Muertos','Navidad','Quince sep'],'Servicios':['Agua','Bait','Gas','Internet','Luz','Mitsubishi']}
 };
+
+// ================================================================
+// CATÁLOGO DINÁMICO — construido desde Firebase, única fuente de verdad
+// ================================================================
+let dynCat = { Ingreso: {}, Gasto: {} };
+
+function buildCatFromPres(presupuesto) {
+  const acc = { Ingreso: {}, Gasto: {} };
+  Object.values(presupuesto).forEach(qData => {
+    ['Ingreso','Gasto'].forEach(tipo => {
+      Object.entries(qData[tipo] || {}).forEach(([cat, conceptos]) => {
+        if (!acc[tipo][cat]) acc[tipo][cat] = new Set();
+        Object.keys(conceptos).forEach(c => acc[tipo][cat].add(c));
+      });
+    });
+  });
+  const result = { Ingreso: {}, Gasto: {} };
+  ['Ingreso','Gasto'].forEach(tipo => {
+    Object.entries(acc[tipo]).forEach(([cat, set]) => {
+      result[tipo][cat] = [...set].sort();
+    });
+  });
+  return result;
+}
 const ICONS={'Nómina':'💼','Acreedores':'🤝','Deuda':'💳','Básicos':'🛒','Escuela':'📚','Entretenimiento':'🎮','Servicios':'🔌','Apoyo':'❤️','Evento':'🎉'};
 const MES_NOM={1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'};
 const MES_NUM=Object.fromEntries(Object.entries(MES_NOM).map(([k,v])=>[v,+k]));
@@ -694,6 +721,7 @@ onValue(R.pres, snap=>{
     });
   } else {
     pres=val;
+    dynCat=buildCatFromPres(pres);
     engCache=calcEngine(pres,movs);
     populatePresSelector();
     populateYearSelectors();
@@ -811,15 +839,31 @@ window.selectTipo=t=>{
   document.getElementById('btn-g').className='tipo-btn'+(t==='Gasto'?' sel-g':'');
   const sel=document.getElementById('f-cat');
   sel.innerHTML='<option value="">Selecciona categoría…</option>';
-  Object.keys(CAT[t]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  Object.keys(dynCat[t]||{}).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   document.getElementById('f-conc').innerHTML='<option value="">Selecciona categoría…</option>';
+  const customEl=document.getElementById('f-conc-custom');if(customEl)customEl.value='';
 };
 window.onCatChange=()=>{
   const cat=document.getElementById('f-cat').value,sel=document.getElementById('f-conc');
   sel.innerHTML='<option value="">Selecciona concepto…</option>';
   if(!cat||!tipoSel) return;
-  (CAT[tipoSel][cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  ((dynCat[tipoSel]||{})[cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  document.getElementById('f-conc-custom').value='';
 };
+window.onConcCustomInput=()=>{
+  // When typing a custom concept, clear the select to avoid ambiguity
+  const custom=document.getElementById('f-conc-custom').value.trim();
+  if(custom) document.getElementById('f-conc').value='';
+};
+// Returns the effective concept value (custom overrides select)
+function getConcepto(){
+  const custom=document.getElementById('f-conc-custom').value.trim();
+  return custom||document.getElementById('f-conc').value;
+}
+// Check if a concept exists in dynCat for given tipo+cat
+function conceptoExisteEnPres(tipo,cat,conc){
+  return !!((dynCat[tipo]||{})[cat]||[]).find(c=>c===conc);
+}
 window.guardarMov=async()=>{
   ['nombre','fecha','tipo','cat','conc','monto'].forEach(f=>{const el=document.getElementById('err-'+f);if(el)el.style.display='none';});
   const data={
@@ -827,25 +871,60 @@ window.guardarMov=async()=>{
     fecha:document.getElementById('f-fecha').value,
     tipo:tipoSel,
     categoria:document.getElementById('f-cat').value,
-    concepto:document.getElementById('f-conc').value,
+    concepto:getConcepto(),
     monto:parseFloat(document.getElementById('f-monto').value)||0,
   };
   const comment=document.getElementById('f-comment').value.trim();
   if(comment) data.comentario=comment;
   const errs=validateMov(data);
   if(errs.length){showFieldErrors(errs);return;}
+
+  // If concept doesn't exist in presupuesto, ask to add it
+  if(data.concepto && data.categoria && !conceptoExisteEnPres(data.tipo,data.categoria,data.concepto)){
+    const quincena=presPeriod||Object.keys(pres).sort((a,b)=>ORDEN_Q.indexOf(a)-ORDEN_Q.indexOf(b)).slice(-1)[0]||'';
+    abrirConfirm(
+      '📌 Concepto nuevo',
+      `"${data.concepto}" no existe en el presupuesto. ¿Deseas agregarlo automáticamente en ${quincena||'la quincena actual'}?
+
+Si dices No, el movimiento se registra sin agregarlo al presupuesto.`,
+      'Sí, agregar al presupuesto',
+      async()=>{
+        if(quincena){
+          await set(ref(db,`presupuesto/${quincena}/${data.tipo}/${data.categoria}/${data.concepto}`),0);
+          await logAudit(data.autor,'presupuesto','crear',null,{periodo:quincena,tipo:data.tipo,cat:data.categoria,conc:data.concepto,monto:0,origen:'captura automática'});
+          showToast(`📌 "${data.concepto}" agregado al presupuesto`);
+        }
+        await _doGuardarMov(data);
+      },
+      false
+    );
+    // Also add a "No, solo registrar" path by overriding the cancel button
+    const cancelBtn=document.querySelector('#modal-confirm .modal-box div button:first-child');
+    if(cancelBtn){
+      const origText=cancelBtn.textContent;
+      cancelBtn.textContent='No, solo registrar';
+      cancelBtn.onclick=async()=>{cerrarConfirm();await _doGuardarMov(data);};
+    }
+    return;
+  }
+
+  await _doGuardarMov(data);
+};
+
+async function _doGuardarMov(data){
   setSS('saving');
   try{
-    const snap=await push(R.movs,{...data,ts:Date.now()});
+    await push(R.movs,{...data,ts:Date.now()});
     await logAudit(data.autor,'movimientos','crear',null,data);
     document.getElementById('f-cat').innerHTML='<option value="">Selecciona categoría…</option>';
     document.getElementById('f-conc').innerHTML='<option value="">Selecciona concepto…</option>';
+    document.getElementById('f-conc-custom').value='';
     document.getElementById('f-monto').value='';
     document.getElementById('f-comment').value='';
     if(tipoSel) window.selectTipo(tipoSel);
     showToast('✅ Movimiento guardado');
   }catch(e){setSS('err');showToast('❌ Error al guardar');}
-};
+}
 
 // ================================================================
 // LISTA
@@ -977,7 +1056,7 @@ window.selectTipoEdit=t=>{
   document.getElementById('ed-btn-g').className='tipo-btn'+(t==='Gasto'?' sel-g':'');
   const sel=document.getElementById('ed-cat'),cur=sel.value;
   sel.innerHTML='<option value="">Selecciona categoría…</option>';
-  Object.keys(CAT[t]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  Object.keys(dynCat[t]||{}).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   sel.value=cur;
   document.getElementById('ed-conc').innerHTML='<option value="">…</option>';
 };
@@ -986,7 +1065,7 @@ window.onCatChangeEdit=()=>{
   const sel=document.getElementById('ed-conc');
   sel.innerHTML='<option value="">Selecciona concepto…</option>';
   if(!cat||!tipoEdit) return;
-  (CAT[tipoEdit][cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  ((dynCat[tipoEdit]||{})[cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   sel.value=cur;
 };
 window.guardarEdit=async()=>{
@@ -1179,7 +1258,7 @@ window.abrirModalConc=(tipo,cat)=>{
   document.getElementById('nc-btn-i').className='tipo-btn'+(tipo==='Ingreso'?' sel-i':'');
   document.getElementById('nc-btn-g').className='tipo-btn'+(tipo==='Gasto'?' sel-g':'');
   const catSel=document.getElementById('nc-cat');catSel.innerHTML='<option value="">Selecciona tipo primero…</option>';
-  if(tipo){Object.keys(CAT[tipo]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});if(cat)catSel.value=cat;}
+  if(tipo){Object.keys(dynCat[tipo]||{}).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});if(cat)catSel.value=cat;}
   window.onNcCatChange();
   document.getElementById('nc-monto').value='';document.getElementById('nc-conc-custom').value='';
   document.getElementById('modal-conc').style.display='flex';
@@ -1190,14 +1269,14 @@ window.selectNcTipo=t=>{
   document.getElementById('nc-btn-i').className='tipo-btn'+(t==='Ingreso'?' sel-i':'');
   document.getElementById('nc-btn-g').className='tipo-btn'+(t==='Gasto'?' sel-g':'');
   const sel=document.getElementById('nc-cat');sel.innerHTML='<option value="">Selecciona categoría…</option>';
-  Object.keys(CAT[t]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  Object.keys(dynCat[t]||{}).sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   document.getElementById('nc-conc-sel').innerHTML='<option value="">Selecciona categoría…</option>';
 };
 window.onNcCatChange=()=>{
   const cat=document.getElementById('nc-cat').value,sel=document.getElementById('nc-conc-sel');
   sel.innerHTML='<option value="">Selecciona concepto…</option>';
   if(!cat||!ncTipo) return;
-  (CAT[ncTipo][cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
+  ((dynCat[ncTipo]||{})[cat]||[]).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
 };
 window.agregarConcepto=async()=>{
   if(!presPeriod){showToast('⚠️ Selecciona una quincena');return;}
