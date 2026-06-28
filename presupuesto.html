@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Presupuesto</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --ink: #1a1a2e; --ink-mid: #4a4a6a; --ink-light: #9090aa;
+    --paper: #f4f3ef; --card: #fff; --accent: #2d6a4f;
+    --accent-light: #52b788; --danger: #c1121f; --divider: #e8e6df;
+    --ingreso-bg: #d8f3dc; --gasto-bg: #fde8e8;
+    --ingreso: #1b4332; --gasto: #6b1a1a;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; padding-bottom: 30px; }
+
+  .header { background: var(--ink); color: white; padding: 16px 20px 14px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 18px; font-weight: 800; }
+  .header-sub { font-size: 12px; opacity: 0.5; margin-top: 2px; display: flex; align-items: center; gap: 8px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; display: inline-block; }
+  .sync-dot.online { background: #52b788; }
+  .sync-dot.syncing { background: #ffd166; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .period-bar { background: white; border-bottom: 1px solid var(--divider); padding: 12px 16px; display: flex; gap: 10px; align-items: center; position: sticky; top: 58px; z-index: 90; }
+  .period-sel { flex: 1; padding: 10px 12px; border: 1.5px solid var(--divider); border-radius: 10px; font-size: 14px; font-weight: 600; appearance: none; -webkit-appearance: none; background: var(--paper); color: var(--ink); }
+  .period-sel:focus { outline: none; border-color: var(--accent); }
+  .add-period-btn { padding: 10px 14px; background: var(--accent); color: white; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+  .section { padding: 14px 16px; }
+
+  .totals-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .total-card { flex: 1; background: white; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .total-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--ink-light); margin-bottom: 4px; }
+  .total-val { font-size: 17px; font-weight: 800; }
+  .total-val.pos { color: var(--ingreso); }
+  .total-val.neg { color: var(--danger); }
+  .total-val.neutral { color: var(--ink); }
+
+  .cat-group { margin-bottom: 18px; }
+  .cat-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0 2px; }
+  .cat-icon { font-size: 16px; }
+  .cat-name { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-mid); }
+  .cat-sum { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--ink-mid); }
+
+  .concepto-row { background: white; border-radius: 10px; padding: 11px 13px; margin-bottom: 7px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .concepto-info { flex: 1; min-width: 0; }
+  .concepto-name { font-size: 14px; font-weight: 600; }
+  .concepto-tipo { font-size: 11px; color: var(--ink-light); margin-top: 1px; }
+  .monto-input { width: 110px; padding: 8px 10px; border: 1.5px solid var(--divider); border-radius: 8px; font-size: 14px; font-weight: 700; text-align: right; background: var(--paper); color: var(--ink); -moz-appearance: textfield; }
+  .monto-input::-webkit-inner-spin-button, .monto-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .monto-input:focus { outline: none; border-color: var(--accent); background: white; }
+  .monto-input.changed { border-color: var(--accent-light); background: white; }
+  .del-concepto { background: none; border: 1.5px solid var(--divider); border-radius: 8px; padding: 6px 8px; font-size: 13px; cursor: pointer; color: var(--ink-light); flex-shrink: 0; }
+
+  .add-concepto-btn { width: 100%; padding: 11px; border: 1.5px dashed var(--divider); border-radius: 10px; background: none; color: var(--ink-mid); font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .add-concepto-btn:active { background: var(--divider); }
+
+  .save-btn { position: fixed; bottom: 20px; left: 16px; right: 16px; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(45,106,79,0.35); z-index: 100; }
+  .save-btn:disabled { opacity: 0.4; box-shadow: none; }
+  .save-btn:active { opacity: 0.85; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.3s; z-index: 300; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* MODALS */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400; align-items: flex-end; justify-content: center; }
+  .modal-box { background: #f4f3ef; border-radius: 20px 20px 0 0; padding: 20px 20px 40px; width: 100%; max-width: 500px; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .modal-title { font-size: 16px; font-weight: 800; }
+  .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #aaa; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-mid); margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 13px 14px; border: 1.5px solid var(--divider); border-radius: 10px; font-size: 16px; color: var(--ink); background: white; appearance: none; -webkit-appearance: none; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .tipo-row { display: flex; gap: 10px; }
+  .tipo-btn { flex: 1; padding: 13px; border: 1.5px solid var(--divider); border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; background: white; color: var(--ink-mid); }
+  .tipo-btn.sel-i { background: var(--ingreso-bg); border-color: var(--accent-light); color: var(--ingreso); }
+  .tipo-btn.sel-g { background: var(--gasto-bg); border-color: #e57373; color: var(--gasto); }
+  .modal-submit { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+
+  .empty-msg { text-align: center; padding: 40px 20px; color: var(--ink-light); font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 Presupuesto</h1>
+  <div class="header-sub">
+    <span class="sync-dot" id="sync-dot"></span>
+    <span id="sync-label">Conectando…</span>
+  </div>
+</div>
+
+<div class="period-bar">
+  <select class="period-sel" id="period-sel" onchange="onPeriodChange()">
+    <option value="">Cargando…</option>
+  </select>
+  <button class="add-period-btn" onclick="abrirNuevoperiodo()">+ Quincena</button>
+</div>
+
+<div class="section" id="main-section">
+  <div class="empty-msg">Selecciona una quincena para ver su presupuesto.</div>
+</div>
+
+<button class="save-btn" id="save-btn" onclick="guardarCambios()" disabled>💾 Guardar cambios</button>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL NUEVO CONCEPTO -->
+<div class="modal-overlay" id="modal-concepto">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">➕ Nuevo concepto</span>
+      <button class="modal-close" onclick="cerrarModalConcepto()">✕</button>
+    </div>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="tipo-row">
+        <button class="tipo-btn" id="nc-btn-i" onclick="selectNcTipo('Ingreso')">💵 Ingreso</button>
+        <button class="tipo-btn" id="nc-btn-g" onclick="selectNcTipo('Gasto')">💸 Gasto</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Categoría</label>
+      <select id="nc-cat" onchange="onNcCatChange()">
+        <option value="">Selecciona tipo primero…</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Concepto</label>
+      <select id="nc-concepto-sel">
+        <option value="">Selecciona categoría primero…</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>O escribe un concepto nuevo</label>
+      <input type="text" id="nc-concepto-custom" placeholder="Nombre del concepto…">
+    </div>
+    <div class="field">
+      <label>Monto planeado</label>
+      <input type="number" inputmode="decimal" id="nc-monto" placeholder="0.00" min="0">
+    </div>
+    <button class="modal-submit" onclick="agregarConcepto()">Agregar</button>
+  </div>
+</div>
+
+<!-- MODAL NUEVA QUINCENA -->
+<div class="modal-overlay" id="modal-periodo">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">📅 Nueva quincena</span>
+      <button class="modal-close" onclick="cerrarModalPeriodo()">✕</button>
+    </div>
+    <div class="field">
+      <label>Nombre de la quincena</label>
+      <input type="text" id="np-nombre" placeholder="Ej. Julio 2026 Q1">
+    </div>
+    <button class="modal-submit" onclick="crearPeriodo()">Crear quincena vacía</button>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBULwJ7fs5X5i7PoEzsTOOZI7QoTgRmhdI",
+  authDomain: "finanzas-mp.firebaseapp.com",
+  databaseURL: "https://finanzas-mp-default-rtdb.firebaseio.com",
+  projectId: "finanzas-mp",
+  storageBucket: "finanzas-mp.firebasestorage.app",
+  messagingSenderId: "52241900300",
+  appId: "1:52241900300:web:4da00314dc1d801387df29"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const presRef = ref(db, 'presupuesto');
+
+// ===== DATOS INICIALES DEL EXCEL =====
+const SEED = {
+  "Julio 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550,"Préstamo":216000,"Bono":0,"Utilidades":0 }, "Acreedores": { "Emilio":1400,"Gustavo":5000 } },
+    "Gasto":   { "Deuda": { "Pago TDC1":110498,"Pago WM":30942,"Préstamo":10500,"Pago TDC2":0 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Uniformes":4500,"Útiles":7500,"Colegiatura":0,"Inscripción":0 }, "Evento": { "Cumpleaños":6800,"Muertos":0,"Navidad":0 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Servicios": { "Mitsubishi":4000 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Julio 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550,"Fondo de ahorro":34000,"Prima":12500,"Aguinaldo":0,"Caja de ahorro":0 }, "Acreedores": { "Lola":4950,"Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Pago TDC":32796,"Préstamo":10500 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250,"Six Flags":300,"Xbox":300 }, "Servicios": { "Internet":1443,"Luz":400,"Gas":400,"Agua":70,"Bait":120 }, "Apoyo": { "Mamá":1400 }, "Evento": { "Quince sep":0 } }
+  },
+  "Agosto 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550,"Bono":0,"Préstamo":0,"Utilidades":0 }, "Acreedores": { "Emilio":1400,"Gustavo":5000 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500,"Pago TDC1":0,"Pago TDC2":0,"Pago WM":0 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Colegiatura":9145,"Inscripción":0,"Uniformes":0,"Útiles":0 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Agosto 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550,"Aguinaldo":0,"Caja de ahorro":0,"Fondo de ahorro":0,"Prima":0 }, "Acreedores": { "Lola":4950,"Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500,"Pago TDC":0 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250,"Six Flags":300,"Xbox":300 }, "Servicios": { "Internet":1443,"Luz":400,"Gas":400,"Agua":70,"Bait":120 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Septiembre 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Emilio":1400 } },
+    "Gasto":   { "Deuda": { "Pago TDC2":18993.83,"Préstamo":10500 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Colegiatura":9145 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Septiembre 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250,"Six Flags":300,"Xbox":300 }, "Servicios": { "Internet":1443,"Luz":400,"Gas":400,"Agua":70,"Bait":120 }, "Apoyo": { "Mamá":1400 }, "Evento": { "Quince sep":2000 } }
+  },
+  "Octubre 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Emilio":1400 } },
+    "Gasto":   { "Deuda": { "Pago TDC2":18993.83,"Préstamo":10500 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Colegiatura":9145 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Octubre 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250,"Six Flags":300,"Xbox":300 }, "Servicios": { "Internet":1443,"Bait":120 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Noviembre 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Emilio":1400 } },
+    "Gasto":   { "Deuda": { "Pago TDC2":18993.83,"Préstamo":10500 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Colegiatura":9145 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Noviembre 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250,"Six Flags":300,"Xbox":300 }, "Servicios": { "Internet":1443,"Luz":400,"Gas":400,"Agua":70,"Bait":120 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Diciembre 2026 Q1": {
+    "Ingreso": { "Nómina": { "Salario":25550 }, "Acreedores": { "Emilio":1400 } },
+    "Gasto":   { "Deuda": { "Pago TDC2":18993.83,"Préstamo":10500 }, "Básicos": { "Despensa1":1500,"Despensa2":1500,"Gasolina":1200 }, "Escuela": { "Colegiatura":9145 }, "Entretenimiento": { "Ocio1":1250,"Ocio2":1250 }, "Apoyo": { "Mamá":1400 } }
+  },
+  "Diciembre 2026 Q2": {
+    "Ingreso": { "Nómina": { "Salario":25550,"Aguinaldo":105000 }, "Acreedores": { "Lucy":1460 } },
+    "Gasto":   { "Deuda": { "Préstamo":10500 }, "Básicos": { "Renta":11650,"Despensa3":1500,"Despensa4":1500,"Gasolina":1200 }, "Entretenimiento": { "Ocio3":1250,"Ocio4":1250 }, "Servicios": { "Internet":1443,"Luz":400,"Gas":400,"Agua":70,"Bait":120 }, "Apoyo": { "Mamá":1400 }, "Evento": { "Navidad":0 } }
+  }
+};
+
+const CATALOGO = {
+  Ingreso: { 'Nómina':['Salario','Bono','Préstamo','Utilidades','Aguinaldo','Caja de ahorro','Fondo de ahorro','Prima'], 'Acreedores':['Emilio','Gustavo','Lola','Lucy'] },
+  Gasto:   { 'Apoyo':['Mamá'], 'Básicos':['Despensa1','Despensa2','Despensa3','Despensa4','Gasolina','Renta'], 'Deuda':['Pago TDC1','Pago TDC2','Pago TDC','Pago WM','Préstamo'], 'Entretenimiento':['Ocio1','Ocio2','Ocio3','Ocio4','Six Flags','Xbox'], 'Escuela':['Colegiatura','Inscripción','Uniformes','Útiles'], 'Evento':['Cumpleaños','Muertos','Navidad','Quince sep'], 'Servicios':['Agua','Bait','Gas','Internet','Luz','Mitsubishi'] }
+};
+const CAT_ICONS = { 'Nómina':'💼','Acreedores':'🤝','Deuda':'💳','Básicos':'🛒','Escuela':'📚','Entretenimiento':'🎮','Servicios':'🔌','Apoyo':'❤️','Evento':'🎉' };
+
+// ===== ESTADO =====
+let presupuesto = {};   // datos de Firebase
+let currentPeriod = '';
+let pendingChanges = {}; // cambios no guardados
+let ncTipo = '';
+
+// ===== SYNC STATUS =====
+function setSyncStatus(s) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  if (s==='online')   { dot.className='sync-dot online';  lbl.textContent='Sincronizado'; }
+  else if (s==='syncing') { dot.className='sync-dot syncing'; lbl.textContent='Guardando…'; }
+  else { dot.className='sync-dot'; lbl.textContent='Sin conexión'; }
+}
+
+// ===== FIREBASE LISTENER =====
+onValue(presRef, snap => {
+  presupuesto = snap.val() || {};
+  // Si no hay datos en Firebase, sembrar con el Excel
+  if (Object.keys(presupuesto).length === 0) {
+    seedFirebase();
+  } else {
+    setSyncStatus('online');
+    populatePeriodSelector();
+    if (currentPeriod) renderPeriod(currentPeriod);
+  }
+}, () => setSyncStatus('offline'));
+
+async function seedFirebase() {
+  setSyncStatus('syncing');
+  try {
+    await set(presRef, SEED);
+    showToast('✅ Presupuesto inicial cargado del Excel');
+  } catch(e) { setSyncStatus('offline'); }
+}
+
+// ===== SELECTOR DE PERIODO =====
+function populatePeriodSelector() {
+  const sel = document.getElementById('period-sel');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Selecciona quincena —</option>';
+  Object.keys(presupuesto).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+  if (prev && presupuesto[prev]) { sel.value = prev; }
+  else if (!currentPeriod) { sel.value = ''; }
+}
+
+window.onPeriodChange = () => {
+  currentPeriod = document.getElementById('period-sel').value;
+  pendingChanges = {};
+  document.getElementById('save-btn').disabled = true;
+  if (currentPeriod) renderPeriod(currentPeriod);
+  else document.getElementById('main-section').innerHTML = '<div class="empty-msg">Selecciona una quincena para ver su presupuesto.</div>';
+};
+
+// ===== RENDER PERIODO =====
+function renderPeriod(period) {
+  const data = presupuesto[period] || {};
+  const section = document.getElementById('main-section');
+  let html = '';
+
+  // Totales
+  let totalI = 0, totalG = 0;
+  ['Ingreso','Gasto'].forEach(tipo => {
+    Object.values(data[tipo]||{}).forEach(cats => Object.values(cats).forEach(v => {
+      if (tipo==='Ingreso') totalI += v||0; else totalG += v||0;
+    }));
+  });
+  const saldo = totalI - totalG;
+  html += `<div class="totals-row">
+    <div class="total-card"><div class="total-label">Ingresos</div><div class="total-val pos">$${Math.round(totalI).toLocaleString('es-MX')}</div></div>
+    <div class="total-card"><div class="total-label">Gastos</div><div class="total-val neg">$${Math.round(totalG).toLocaleString('es-MX')}</div></div>
+    <div class="total-card"><div class="total-label">Saldo</div><div class="total-val ${saldo>=0?'pos':'neg'}">$${Math.round(saldo).toLocaleString('es-MX')}</div></div>
+  </div>`;
+
+  // Ingresos
+  html += renderTipoSection(data, period, 'Ingreso');
+  // Gastos
+  html += renderTipoSection(data, period, 'Gasto');
+
+  section.innerHTML = html;
+  attachInputListeners();
+}
+
+function renderTipoSection(data, period, tipo) {
+  const tipoData = data[tipo] || {};
+  let html = `<h3 style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-light);margin-bottom:10px;padding:0 2px;">${tipo === 'Ingreso' ? '💵 INGRESOS' : '💸 GASTOS'}</h3>`;
+  Object.entries(tipoData).forEach(([cat, conceptos]) => {
+    const catSum = Object.values(conceptos).reduce((a,b)=>(a||0)+(b||0),0);
+    html += `<div class="cat-group">
+      <div class="cat-header">
+        <span class="cat-icon">${CAT_ICONS[cat]||'📌'}</span>
+        <span class="cat-name">${cat}</span>
+        <span class="cat-sum">$${Math.round(catSum).toLocaleString('es-MX')}</span>
+      </div>`;
+    Object.entries(conceptos).forEach(([concepto, monto]) => {
+      html += `<div class="concepto-row">
+        <div class="concepto-info">
+          <div class="concepto-name">${concepto}</div>
+          <div class="concepto-tipo">${tipo} · ${cat}</div>
+        </div>
+        <input class="monto-input" type="number" inputmode="decimal" min="0"
+          value="${monto||0}"
+          data-period="${period}" data-tipo="${tipo}" data-cat="${cat}" data-concepto="${concepto}">
+        <button class="del-concepto" onclick="eliminarConcepto('${period}','${tipo}','${cat}','${concepto}')">🗑</button>
+      </div>`;
+    });
+    html += `<button class="add-concepto-btn" onclick="abrirModalConcepto('${tipo}','${cat}')">+ Agregar concepto en ${cat}</button>`;
+    html += `</div>`;
+  });
+  html += `<button class="add-concepto-btn" style="margin-bottom:20px" onclick="abrirModalConcepto('${tipo}','')">+ Agregar categoría/concepto de ${tipo==='Ingreso'?'Ingreso':'Gasto'}</button>`;
+  return html;
+}
+
+function attachInputListeners() {
+  document.querySelectorAll('.monto-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const { period, tipo, cat, concepto } = inp.dataset;
+      if (!pendingChanges[period]) pendingChanges[period] = {};
+      if (!pendingChanges[period][tipo]) pendingChanges[period][tipo] = {};
+      if (!pendingChanges[period][tipo][cat]) pendingChanges[period][tipo][cat] = {};
+      pendingChanges[period][tipo][cat][concepto] = parseFloat(inp.value)||0;
+      inp.classList.add('changed');
+      document.getElementById('save-btn').disabled = false;
+    });
+  });
+}
+
+// ===== GUARDAR =====
+window.guardarCambios = async () => {
+  if (!Object.keys(pendingChanges).length) return;
+  setSyncStatus('syncing');
+  try {
+    // Merge changes into presupuesto and save
+    for (const [period, tipoData] of Object.entries(pendingChanges)) {
+      for (const [tipo, catData] of Object.entries(tipoData)) {
+        for (const [cat, conceptos] of Object.entries(catData)) {
+          for (const [concepto, monto] of Object.entries(conceptos)) {
+            await set(ref(db, `presupuesto/${period}/${tipo}/${cat}/${concepto}`), monto);
+          }
+        }
+      }
+    }
+    pendingChanges = {};
+    document.getElementById('save-btn').disabled = true;
+    showToast('✅ Presupuesto guardado');
+  } catch(e) { setSyncStatus('offline'); showToast('❌ Error al guardar'); }
+};
+
+// ===== ELIMINAR CONCEPTO =====
+window.eliminarConcepto = async (period, tipo, cat, concepto) => {
+  setSyncStatus('syncing');
+  try {
+    await remove(ref(db, `presupuesto/${period}/${tipo}/${cat}/${concepto}`));
+    showToast('🗑 Concepto eliminado');
+  } catch(e) { setSyncStatus('offline'); showToast('❌ Error'); }
+};
+
+// ===== MODAL NUEVO CONCEPTO =====
+window.abrirModalConcepto = (tipo, cat) => {
+  ncTipo = tipo || '';
+  document.getElementById('nc-btn-i').className = 'tipo-btn' + (tipo==='Ingreso'?' sel-i':'');
+  document.getElementById('nc-btn-g').className = 'tipo-btn' + (tipo==='Gasto'?' sel-g':'');
+  const catSel = document.getElementById('nc-cat');
+  catSel.innerHTML = '<option value="">Selecciona tipo primero…</option>';
+  if (tipo) {
+    Object.keys(CATALOGO[tipo]).forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; catSel.appendChild(o); });
+    if (cat) catSel.value = cat;
+  }
+  window.onNcCatChange();
+  document.getElementById('nc-monto').value = '';
+  document.getElementById('nc-concepto-custom').value = '';
+  document.getElementById('modal-concepto').style.display = 'flex';
+};
+window.cerrarModalConcepto = () => { document.getElementById('modal-concepto').style.display = 'none'; };
+
+window.selectNcTipo = (tipo) => {
+  ncTipo = tipo;
+  document.getElementById('nc-btn-i').className = 'tipo-btn' + (tipo==='Ingreso'?' sel-i':'');
+  document.getElementById('nc-btn-g').className = 'tipo-btn' + (tipo==='Gasto'?' sel-g':'');
+  const sel = document.getElementById('nc-cat');
+  sel.innerHTML = '<option value="">Selecciona categoría…</option>';
+  Object.keys(CATALOGO[tipo]).forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  document.getElementById('nc-concepto-sel').innerHTML = '<option value="">Selecciona categoría primero…</option>';
+};
+
+window.onNcCatChange = () => {
+  const cat = document.getElementById('nc-cat').value;
+  const sel = document.getElementById('nc-concepto-sel');
+  sel.innerHTML = '<option value="">Selecciona concepto…</option>';
+  if (!cat || !ncTipo) return;
+  (CATALOGO[ncTipo][cat]||[]).forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+};
+
+window.agregarConcepto = async () => {
+  if (!currentPeriod) { showToast('⚠️ Selecciona una quincena'); return; }
+  const tipo = ncTipo;
+  const cat = document.getElementById('nc-cat').value;
+  const conceptoSel = document.getElementById('nc-concepto-sel').value;
+  const conceptoCustom = document.getElementById('nc-concepto-custom').value.trim();
+  const concepto = conceptoCustom || conceptoSel;
+  const monto = parseFloat(document.getElementById('nc-monto').value)||0;
+
+  if (!tipo) { showToast('⚠️ Selecciona Ingreso o Gasto'); return; }
+  if (!cat)  { showToast('⚠️ Selecciona categoría'); return; }
+  if (!concepto) { showToast('⚠️ Escribe o selecciona un concepto'); return; }
+
+  setSyncStatus('syncing');
+  try {
+    await set(ref(db, `presupuesto/${currentPeriod}/${tipo}/${cat}/${concepto}`), monto);
+    cerrarModalConcepto();
+    showToast('✅ Concepto agregado');
+  } catch(e) { setSyncStatus('offline'); showToast('❌ Error'); }
+};
+
+// ===== MODAL NUEVA QUINCENA =====
+window.abrirNuevoperiodo = () => {
+  document.getElementById('np-nombre').value = '';
+  document.getElementById('modal-periodo').style.display = 'flex';
+};
+window.cerrarModalPeriodo = () => { document.getElementById('modal-periodo').style.display = 'none'; };
+
+window.crearPeriodo = async () => {
+  const nombre = document.getElementById('np-nombre').value.trim();
+  if (!nombre) { showToast('⚠️ Escribe el nombre de la quincena'); return; }
+  if (presupuesto[nombre]) { showToast('⚠️ Ya existe esa quincena'); return; }
+  setSyncStatus('syncing');
+  try {
+    await set(ref(db, `presupuesto/${nombre}`), { Ingreso: {}, Gasto: {} });
+    cerrarModalPeriodo();
+    document.getElementById('period-sel').value = nombre;
+    currentPeriod = nombre;
+    showToast('✅ Quincena creada');
+  } catch(e) { setSyncStatus('offline'); showToast('❌ Error'); }
+};
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+window.showToast = showToast;
+</script>
+</body>
+</html>
