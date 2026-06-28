@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Horizonte v0.2.0</title>
+<title>Horizonte v0.2.1</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -96,6 +96,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .month-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-bottom:7px}
 .month-chip{padding:5px 3px;border:1.5px solid var(--divider);border-radius:7px;font-size:10px;font-weight:600;text-align:center;cursor:pointer;background:white;color:var(--ink-mid);user-select:none}
 .month-chip.selected{background:var(--ingreso-bg);border-color:var(--accent-light);color:var(--ingreso)}
+.year-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.year-chip{padding:5px 12px;border:1.5px solid var(--divider);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:white;color:var(--ink-mid);user-select:none}
+.year-chip.selected{background:var(--ingreso-bg);border-color:var(--accent-light);color:var(--ingreso)}
 .month-actions{display:flex;gap:5px;margin-bottom:5px}
 .month-action-btn{padding:4px 9px;border:1.5px solid var(--divider);border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:white;color:var(--ink-mid)}
 .apply-btn{width:100%;padding:9px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
@@ -171,7 +174,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="header">
   <div class="header-top">
-    <div><h1>💰 Horizonte</h1><div class="version">v0.2.0 · 2025-01-01</div></div>
+    <div><h1>💰 Horizonte</h1><div class="version">v0.2.1 · 2025-07-01</div></div>
     <button onclick="showSection('config')" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;opacity:.7">⚙️</button>
   </div>
   <div class="sync-bar">
@@ -226,12 +229,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- RESUMEN -->
 <div class="section" id="sec-res">
   <div class="filter-area">
-    <div class="filter-row">
-      <select class="f-sel" id="res-anio" onchange="onAnioChange()" style="flex:1"><option value="">Año…</option></select>
+    <div style="font-size:10px;font-weight:700;color:var(--ink-mid);margin-bottom:4px">Años:</div>
+    <div class="year-chips" id="res-year-chips"></div>
+    <div class="month-actions">
+      <button class="month-action-btn" onclick="toggleAllYears(true,'res')">Todos</button>
+      <button class="month-action-btn" onclick="toggleAllYears(false,'res')">Ninguno</button>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:var(--ink-mid);margin-bottom:4px">Meses:</div>
+    <div class="month-grid" id="month-grid"></div>
+    <div class="month-actions">
       <button class="month-action-btn" onclick="toggleAllMonths(true)">Todos</button>
       <button class="month-action-btn" onclick="toggleAllMonths(false)">Ninguno</button>
     </div>
-    <div class="month-grid" id="month-grid"></div>
     <div style="margin-bottom:7px">
       <div style="font-size:10px;font-weight:700;color:var(--ink-mid);margin-bottom:5px">Jerarquía:</div>
       <div class="levels-wrap" id="levels-wrap"></div>
@@ -243,15 +252,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <!-- DASHBOARD -->
 <div class="section" id="sec-dash">
-  <div class="dash-filter">
-    <select class="f-sel" id="dash-anio" onchange="renderDashboard()" style="flex:1"><option value="">Año…</option></select>
-    <select class="f-sel" id="dash-mes" onchange="renderDashboard()" style="flex:1">
-      <option value="">Mes (todos)</option>
-      <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
-      <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
-      <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
-      <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-    </select>
+  <div class="filter-area">
+    <div style="font-size:10px;font-weight:700;color:var(--ink-mid);margin-bottom:4px">Años:</div>
+    <div class="year-chips" id="dash-year-chips"></div>
+    <div class="month-actions">
+      <button class="month-action-btn" onclick="toggleAllYears(true,'dash')">Todos</button>
+      <button class="month-action-btn" onclick="toggleAllYears(false,'dash')">Ninguno</button>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:var(--ink-mid);margin-bottom:4px">Meses:</div>
+    <div class="month-grid" id="dash-month-grid"></div>
+    <div class="month-actions">
+      <button class="month-action-btn" onclick="toggleAllDashMonths(true)">Todos</button>
+      <button class="month-action-btn" onclick="toggleAllDashMonths(false)">Ninguno</button>
+    </div>
+    <button class="apply-btn" style="margin-top:4px" onclick="renderDashboard()">Aplicar filtros</button>
   </div>
   <div id="dash-content"><div class="empty-state"><div class="ei">🏠</div><p>Selecciona un año.</p></div></div>
 </div>
@@ -455,6 +469,9 @@ const SEED={
 // Toda la app consume engineCache.
 // ================================================================
 function calcEngine(presupuesto, movimientos) {
+  // Pure function — no Firebase access, no side effects.
+  // Tracks SEPARATE plan and real saldo chains to correctly propagate
+  // balance anterior for both columns independently.
   const movArr = Object.values(movimientos).filter(m => !m.deleted);
 
   function movInQ(m, p) {
@@ -465,31 +482,55 @@ function calcEngine(presupuesto, movimientos) {
     return info.q===1 ? d<=15 : d>15;
   }
 
-  const allP = [...ORDEN_Q.filter(p=>presupuesto[p]), ...Object.keys(presupuesto).filter(p=>!ORDEN_Q.includes(p))];
+  const allP = [...ORDEN_Q.filter(p=>presupuesto[p]),
+                ...Object.keys(presupuesto).filter(p=>!ORDEN_Q.includes(p))];
   const result = {};
-  let saldoPrev = 0;
+  // Separate accumulators for plan and real saldo chains
+  let planSaldoPrev = 0;
+  let realSaldoPrev = 0;
+  // Track Q1 intermediate values for Q2 to use
+  let planSaldoQ1_buf = 0;
+  let realSaldoQ1_buf = 0;
 
   for (const p of allP) {
     const pData = presupuesto[p]||{};
     const info = parsePQ(p); if (!info) continue;
-    let planI=0,planG=0,realI=0,realG=0;
+
+    let planI=0, planG=0, realI=0, realG=0;
     Object.values(pData.Ingreso||{}).forEach(c=>Object.values(c).forEach(v=>planI+=v||0));
     Object.values(pData.Gasto||{}).forEach(c=>Object.values(c).forEach(v=>planG+=v||0));
     const movsQ = movArr.filter(m=>movInQ(m,p));
     movsQ.forEach(m=>{ if(m.tipo==='Ingreso')realI+=m.monto||0; else realG+=m.monto||0; });
 
     if (info.q===1) {
-      const balance=saldoPrev;
-      result[p]={periodo:p,info,planI,planG,realI,realG,balance,saldo:null,
-        planSaldoQ1:balance+planI-planG, realSaldoQ1:balance+realI-realG, movsQ};
+      const planBalance = planSaldoPrev;
+      const realBalance = realSaldoPrev;
+      planSaldoQ1_buf = planBalance + planI - planG;
+      realSaldoQ1_buf = realBalance + realI - realG;
+      result[p] = {
+        periodo:p, info, planI, planG, realI, realG,
+        planBalance, realBalance,
+        // Legacy compat
+        balance: planBalance,
+        saldo: null,
+        planSaldoQ1: planSaldoQ1_buf,
+        realSaldoQ1: realSaldoQ1_buf,
+        movsQ
+      };
     } else {
-      const q1 = allP.find(q=>{const qi=parsePQ(q);return qi&&qi.anio===info.anio&&qi.mes===info.mes&&qi.q===1;});
-      const q1d = q1?result[q1]:null;
-      const pSQ1=q1d?q1d.planSaldoQ1:saldoPrev, rSQ1=q1d?q1d.realSaldoQ1:saldoPrev;
-      const saldo=pSQ1+planI-planG, realSaldo=rSQ1+realI-realG;
-      result[p]={periodo:p,info,planI,planG,realI,realG,balance:null,saldo,realSaldo,
-        planSaldoQ1:pSQ1,realSaldoQ1:rSQ1,movsQ};
-      saldoPrev=realSaldo;
+      const planSaldo = planSaldoQ1_buf + planI - planG;
+      const realSaldo = realSaldoQ1_buf + realI - realG;
+      planSaldoPrev = planSaldo;
+      realSaldoPrev = realSaldo;
+      result[p] = {
+        periodo:p, info, planI, planG, realI, realG,
+        planBalance: null, realBalance: null,
+        balance: null,
+        saldo: planSaldo, realSaldo,
+        planSaldoQ1: planSaldoQ1_buf,
+        realSaldoQ1: realSaldoQ1_buf,
+        movsQ
+      };
     }
   }
   return result;
@@ -524,14 +565,29 @@ function runValidation(pres, movs) {
   const faltantes=ORDEN_Q.filter(p=>!pres[p]);
   if (faltantes.length) warnings.push(`Quincenas faltantes en Firebase: ${faltantes.join(', ')}`);
 
-  // Prueba de regresión — saldos vs Excel
+  // Prueba de regresión — saldos plan vs Excel (18 Q2 saldos)
   const engine = calcEngine(pres, movs);
   let regOk=true;
+  // Validate plan balances for Q1s
+  const EXCEL_BAL={
+    'Julio 2026 Q1':0,'Agosto 2026 Q1':77491,'Septiembre 2026 Q1':80373,
+    'Octubre 2026 Q1':52311.167,'Noviembre 2026 Q1':27119.333,'Diciembre 2026 Q1':-1032.5,
+    'Enero 2027 Q1':69908.667,'Febrero 2027 Q1':175338.833,'Marzo 2027 Q1':134817.75,
+    'Abril 2027 Q1':171473.25,'Mayo 2027 Q1':160433.25,'Junio 2027 Q1':156016.25,
+    'Julio 2027 Q1':165976.25,'Agosto 2027 Q1':175406.25,'Septiembre 2027 Q1':184836.25,
+    'Octubre 2027 Q1':194266.25,'Noviembre 2027 Q1':203696.25,'Diciembre 2027 Q1':223185.75,
+  };
+  Object.entries(EXCEL_BAL).forEach(([p,ex])=>{
+    const eng=engine[p];
+    if (!eng) { errors.push(`Regresión balance: ${p} no calculado`); regOk=false; return; }
+    const diff=Math.abs(eng.planBalance-ex);
+    if (diff>0.5) { errors.push(`Regresión balance: ${p} got=${eng.planBalance.toFixed(3)} expected=${ex} diff=${diff.toFixed(3)}`); regOk=false; }
+  });
   Object.entries(EXCEL_SALDOS).forEach(([p,ex])=>{
     const eng=engine[p];
-    if (!eng) { errors.push(`Prueba regresión: ${p} no calculado`); regOk=false; return; }
+    if (!eng) { errors.push(`Regresión saldo: ${p} no calculado`); regOk=false; return; }
     const diff=Math.abs(eng.saldo-ex);
-    if (diff>0.5) { errors.push(`Prueba regresión: ${p} plan=${eng.saldo.toFixed(2)} excel=${ex} diff=${diff.toFixed(2)}`); regOk=false; }
+    if (diff>0.5) { errors.push(`Regresión saldo: ${p} got=${eng.saldo.toFixed(3)} expected=${ex} diff=${diff.toFixed(3)}`); regOk=false; }
   });
 
   if (errors.length===0&&warnings.length===0) {
@@ -540,7 +596,7 @@ function runValidation(pres, movs) {
     errors.forEach(e=>console.error('❌',e));
     warnings.forEach(w=>console.warn('⚠️',w));
   }
-  if (regOk) console.log('%c✅ Prueba de regresión: TODOS LOS SALDOS COINCIDEN CON EL EXCEL','color:#2d6a4f;font-weight:bold');
+  if (regOk) console.log('%c✅ Prueba de regresión v0.2.1: 18 balances Q1 + 18 saldos Q2 — TODOS OK','color:#2d6a4f;font-weight:bold');
   console.log(`Resumen: ${errors.length} errores, ${warnings.length} advertencias`);
   console.groupEnd();
 }
@@ -676,19 +732,55 @@ window.showSection=name=>{
 };
 
 // ================================================================
-// YEAR SELECTORS — dinámicos desde Firebase
+// YEAR CHIPS — shared between Resumen and Dashboard
 // ================================================================
-function populateYearSelectors() {
-  const years=new Set();
-  sortedP(pres).forEach(p=>{ const i=parsePQ(p); if(i) years.add(String(i.anio)); });
-  Object.values(movs).forEach(m=>{ if(m.fecha) years.add(m.fecha.split('-')[0]); });
-  ['res-anio','dash-anio'].forEach(id=>{
-    const sel=document.getElementById(id),prev=sel.value;
-    sel.innerHTML='<option value="">Año…</option>';
-    [...years].sort().forEach(y=>{ const o=document.createElement('option');o.value=y;o.textContent=y;sel.appendChild(o); });
-    if(prev) sel.value=prev;
-  });
+let selYearsRes = new Set();
+let selYearsDash = new Set();
+let selMonthsDash = new Set();
+
+function getAvailableYears() {
+  const years = new Set();
+  sortedP(pres).forEach(p=>{ const i=parsePQ(p); if(i) years.add(i.anio); });
+  Object.values(movs).forEach(m=>{ if(m.fecha) years.add(+m.fecha.split('-')[0]); });
+  return [...years].sort();
 }
+
+function populateYearChips() {
+  const years = getAvailableYears();
+  renderYearChips('res-year-chips', years, selYearsRes, 'res');
+  renderYearChips('dash-year-chips', years, selYearsDash, 'dash');
+}
+
+function renderYearChips(containerId, years, selSet, scope) {
+  const wrap = document.getElementById(containerId); if(!wrap) return;
+  wrap.innerHTML = years.map(y =>
+    `<div class="year-chip ${selSet.has(y)?'selected':''}" onclick="toggleYear(${y},'${scope}')">${y}</div>`
+  ).join('');
+}
+
+window.toggleYear = (y, scope) => {
+  const set = scope==='res' ? selYearsRes : selYearsDash;
+  if(set.has(y)) set.delete(y); else set.add(y);
+  renderYearChips(scope==='res'?'res-year-chips':'dash-year-chips', getAvailableYears(), set, scope);
+};
+window.toggleAllYears = (all, scope) => {
+  const set = scope==='res' ? selYearsRes : selYearsDash;
+  if(all) getAvailableYears().forEach(y=>set.add(y)); else set.clear();
+  renderYearChips(scope==='res'?'res-year-chips':'dash-year-chips', getAvailableYears(), set, scope);
+};
+
+// Dashboard month chips
+function buildDashMonthGrid() {
+  const grid = document.getElementById('dash-month-grid'); if(!grid) return;
+  grid.innerHTML = Object.entries(MES_NOM).map(([num,nom])=>
+    `<div class="month-chip ${selMonthsDash.has(+num)?'selected':''}" onclick="toggleDashMonth(${num})">${nom.substring(0,3)}</div>`
+  ).join('');
+}
+window.toggleDashMonth = n => { if(selMonthsDash.has(n))selMonthsDash.delete(n);else selMonthsDash.add(n); buildDashMonthGrid(); };
+window.toggleAllDashMonths = all => { if(all)for(let i=1;i<=12;i++)selMonthsDash.add(i);else selMonthsDash.clear(); buildDashMonthGrid(); };
+
+// Legacy: keep populateYearSelectors name working
+function populateYearSelectors() { populateYearChips(); }
 
 // ================================================================
 // VALIDACIÓN CENTRALIZADA
@@ -995,10 +1087,10 @@ function renderPresupuesto(period){
   let html='';
 
   if(info){
-    if(info.q===1&&eng.balance!==undefined&&eng.balance!==null){
+    if(info.q===1&&eng.planBalance!==null&&eng.planBalance!==undefined){
       html+=`<div class="totals-row">
-        <div class="total-card"><div class="total-lbl">⚖️ Balance plan</div><div class="total-val ${eng.balance>=0?'tv-pos':'tv-neg'}">${F(eng.balance)}</div></div>
-        <div class="total-card"><div class="total-lbl">⚖️ Balance real</div><div class="total-val ${eng.balance>=0?'tv-pos':'tv-neg'}">${F(eng.balance)}</div></div>
+        <div class="total-card"><div class="total-lbl">⚖️ Balance plan</div><div class="total-val ${eng.planBalance>=0?'tv-pos':'tv-neg'}">${F(eng.planBalance)}</div></div>
+        <div class="total-card"><div class="total-lbl">⚖️ Balance real</div><div class="total-val ${(eng.realBalance||0)>=0?'tv-pos':'tv-neg'}">${F(eng.realBalance||0)}</div></div>
       </div>`;
     }
     if(info.q===2&&eng.saldo!=null){
@@ -1148,31 +1240,13 @@ function buildMonthGrid(){
 }
 window.toggleMonth=n=>{if(selMonths.has(n))selMonths.delete(n);else selMonths.add(n);buildMonthGrid();};
 window.toggleAllMonths=all=>{if(all)for(let i=1;i<=12;i++)selMonths.add(i);else selMonths.clear();buildMonthGrid();};
-window.onAnioChange=()=>buildMonthGrid();
-
-function renderLevelsUI(){
-  const w=document.getElementById('levels-wrap');
-  w.innerHTML=lvlActivos.map((n,i)=>`<div class="level-chip">
-    <button onclick="moverNivel(${i},-1)" ${i===0?'style="opacity:.3;pointer-events:none"':''}>◀</button>
-    ${n}
-    <button onclick="moverNivel(${i},1)" ${i===lvlActivos.length-1?'style="opacity:.3;pointer-events:none"':''}>▶</button>
-    <button onclick="quitarNivel(${i})">✕</button>
-  </div>`).join('');
-  ALL_LVL.filter(n=>!lvlActivos.includes(n)).forEach(n=>{
-    w.innerHTML+=`<div class="level-chip" style="background:var(--ink-light);cursor:pointer" onclick="agregarNivel('${n}')">+ ${n}</div>`;
-  });
-}
-window.moverNivel=(i,d)=>{const j=i+d;if(j<0||j>=lvlActivos.length)return;[lvlActivos[i],lvlActivos[j]]=[lvlActivos[j],lvlActivos[i]];renderLevelsUI();};
-window.quitarNivel=i=>{lvlActivos.splice(i,1);renderLevelsUI();};
-window.agregarNivel=n=>{lvlActivos.push(n);renderLevelsUI();};
-
+// onAnioChange removed — replaced by year chips
 window.renderResumen=()=>{
-  const anioFil=parseInt(document.getElementById('res-anio').value)||null;
-  if(!anioFil){document.getElementById('res-content').innerHTML='<div class="empty-state"><div class="ei">📊</div><p>Selecciona al menos un año.</p></div>';return;}
+  if(selYearsRes.size===0){document.getElementById('res-content').innerHTML='<div class="empty-state"><div class="ei">📊</div><p>Selecciona al menos un año.</p></div>';return;}
   const mesesFil=selMonths.size>0?selMonths:null;
   const periods=sortedP(pres).filter(p=>{
     const i=parsePQ(p);if(!i)return false;
-    if(i.anio!==anioFil)return false;
+    if(!selYearsRes.has(i.anio))return false;
     if(mesesFil&&!mesesFil.has(i.mes))return false;
     return true;
   });
@@ -1233,8 +1307,10 @@ window.renderResumen=()=>{
       if(isOpen){
         if(nivel==='Quincena'){
           const eng=engCache[key];
-          if(eng&&eng.info.q===1&&eng.balance!==null)
-            html+=`<div class="tree-row lvl-3" style="background:#fff8e1;cursor:default"><span class="tr-toggle"></span><span class="tr-lbl" style="color:var(--warn);font-weight:700">⚖️ Balance anterior</span><div class="tr-cols"><span class="tr-c c-plan ${eng.balance>=0?'r-pos':'r-neg'}">${F(eng.balance)}</span><span class="tr-c c-real ${eng.balance>=0?'r-pos':'r-neg'}">${F(eng.balance)}</span><span class="tr-c c-var"></span><span class="tr-c c-pct"></span></div></div>`;
+          if(eng&&eng.info.q===1&&eng.planBalance!==null){
+            const pb=eng.planBalance, rb=eng.realBalance;
+            html+=`<div class="tree-row lvl-3" style="background:#fff8e1;cursor:default"><span class="tr-toggle"></span><span class="tr-lbl" style="color:var(--warn);font-weight:700">⚖️ Balance anterior</span><div class="tr-cols"><span class="tr-c c-plan ${pb>=0?'r-pos':'r-neg'}">${F(pb)}</span><span class="tr-c c-real ${rb>=0?'r-pos':'r-neg'}">${F(rb)}</span><span class="tr-c c-var"></span><span class="tr-c c-pct"></span></div></div>`;
+          }
         }
         html+=buildTree(gR,li+1,id);
         if(nivel==='Quincena'){
@@ -1259,26 +1335,28 @@ window.toggleNode=id=>{treeOpen[id]=!treeOpen[id];window.renderResumen();};
 // DASHBOARD — consume engCache
 // ================================================================
 window.renderDashboard=()=>{
-  const anioFil=parseInt(document.getElementById('dash-anio').value)||null;
-  const mesFil=parseInt(document.getElementById('dash-mes').value)||null;
-  if(!anioFil){document.getElementById('dash-content').innerHTML='<div class="empty-state"><div class="ei">🏠</div><p>Selecciona un año.</p></div>';return;}
+  if(selYearsDash.size===0){document.getElementById('dash-content').innerHTML='<div class="empty-state"><div class="ei">🏠</div><p>Selecciona al menos un año.</p></div>';return;}
+  const mesesFil=selMonthsDash.size>0?selMonthsDash:null;
 
   let planI=0,planG=0,realI=0,realG=0,lastQ2=null;
   sortedP(pres).forEach(p=>{
     const eng=engCache[p];if(!eng)return;
-    if(eng.info.anio!==anioFil)return;
-    if(mesFil&&eng.info.mes!==mesFil)return;
+    if(!selYearsDash.has(eng.info.anio))return;
+    if(mesesFil&&!mesesFil.has(eng.info.mes))return;
     planI+=eng.planI;planG+=eng.planG;realI+=eng.realI;realG+=eng.realG;
     if(eng.info.q===2)lastQ2=eng;
   });
 
+  const yearsArr=[...selYearsDash].sort();
   const saldo=realI-realG,pctG=planG>0?Math.min((realG/planG)*100,100):0;
-  const titulo=mesFil?`${MES_NOM[mesFil]} ${anioFil}`:String(anioFil);
+  const titulo=mesesFil&&mesesFil.size===1
+    ? `${MES_NOM[[...mesesFil][0]]} ${yearsArr.join('/')}`
+    : yearsArr.join(' + ');
   const movArr=Object.values(movs).filter(m=>{
     if(m.deleted||!m.fecha)return false;
     const[y,mo]=m.fecha.split('-').map(Number);
-    if(y!==anioFil)return false;
-    if(mesFil&&mo!==mesFil)return false;
+    if(!selYearsDash.has(y))return false;
+    if(mesesFil&&!mesesFil.has(mo))return false;
     return true;
   });
   const porCat={};
@@ -1355,6 +1433,7 @@ window.showToast=showToast;
 // ================================================================
 document.getElementById('f-fecha').value=new Date().toISOString().split('T')[0];
 buildMonthGrid();
+buildDashMonthGrid();
 renderLevelsUI();
 </script>
 </body>
