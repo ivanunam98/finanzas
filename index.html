@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Finanzas Familiar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --ink: #1a1a2e; --ink-mid: #4a4a6a; --ink-light: #9090aa;
+    --paper: #f4f3ef; --card: #ffffff; --accent: #2d6a4f;
+    --accent-light: #52b788; --danger: #c1121f; --divider: #e8e6df;
+    --ingreso: #1b4332; --gasto: #6b1a1a;
+    --ingreso-bg: #d8f3dc; --gasto-bg: #fde8e8;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; padding-bottom: 80px; }
+
+  .header { background: var(--ink); color: white; padding: 18px 20px 16px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 19px; font-weight: 800; letter-spacing: -0.4px; }
+  .header-sub { font-size: 12px; opacity: 0.5; margin-top: 3px; display: flex; align-items: center; gap: 8px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; display: inline-block; }
+  .sync-dot.online { background: #52b788; }
+  .sync-dot.syncing { background: #ffd166; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .tabs { display: flex; background: white; border-bottom: 1px solid var(--divider); position: sticky; top: 68px; z-index: 90; }
+  .tab { flex: 1; padding: 13px 0; text-align: center; font-size: 13px; font-weight: 600; color: var(--ink-mid); cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .section { display: none; padding: 16px; }
+  .section.active { display: block; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-mid); margin-bottom: 6px; }
+  .field input, .field select { width: 100%; padding: 13px 14px; border: 1.5px solid var(--divider); border-radius: 10px; font-size: 16px; color: var(--ink); background: white; appearance: none; -webkit-appearance: none; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+
+  .tipo-row { display: flex; gap: 10px; }
+  .tipo-btn { flex: 1; padding: 13px; border: 1.5px solid var(--divider); border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; background: white; color: var(--ink-mid); transition: all 0.15s; }
+  .tipo-btn.selected-ingreso { background: var(--ingreso-bg); border-color: var(--accent-light); color: var(--ingreso); }
+  .tipo-btn.selected-gasto { background: var(--gasto-bg); border-color: #e57373; color: var(--gasto); }
+
+  .submit-btn { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+  .submit-btn:active { opacity: 0.85; }
+  .submit-btn:disabled { opacity: 0.4; }
+
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .list-count { font-size: 13px; color: var(--ink-mid); font-weight: 600; }
+  .export-btn { padding: 8px 14px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .export-btn:disabled { opacity: 0.4; }
+
+  .mov-item { background: white; border-radius: 12px; padding: 13px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .mov-tipo-dot { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .dot-ingreso { background: var(--ingreso-bg); }
+  .dot-gasto { background: var(--gasto-bg); }
+  .mov-body { flex: 1; min-width: 0; }
+  .mov-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .mov-concepto { font-size: 15px; font-weight: 700; }
+  .mov-monto { font-size: 15px; font-weight: 800; flex-shrink: 0; margin-left: 8px; }
+  .mov-monto.ingreso { color: var(--ingreso); }
+  .mov-monto.gasto { color: var(--danger); }
+  .mov-meta { font-size: 12px; color: var(--ink-light); margin-top: 3px; }
+  .mov-autor { font-size: 11px; color: var(--accent-light); margin-top: 2px; font-weight: 600; }
+
+  .action-btns { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+  .action-btn { background: none; border: 1.5px solid var(--divider); border-radius: 8px; font-size: 14px; cursor: pointer; padding: 5px 8px; color: var(--ink-light); line-height: 1; }
+  .action-btn:active { background: var(--paper); }
+
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--ink-light); }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; line-height: 1.5; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--ink); color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.3s; z-index: 500; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid var(--divider); display: flex; padding: 8px 0 env(safe-area-inset-bottom); z-index: 200; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; cursor: pointer; color: var(--ink-light); font-size: 11px; font-weight: 600; border: none; background: none; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn .icon { font-size: 20px; }
+
+  /* Nombre usuario */
+  .nombre-wrap { background: white; border-radius: 12px; padding: 14px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .nombre-wrap label { font-size: 13px; font-weight: 700; color: var(--ink-mid); white-space: nowrap; }
+  .nombre-wrap input { flex: 1; border: 1.5px solid var(--divider); border-radius: 8px; padding: 8px 10px; font-size: 14px; font-weight: 600; }
+  .nombre-wrap input:focus { outline: none; border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💸 Finanzas Familiar</h1>
+  <div class="header-sub">
+    <span class="sync-dot" id="sync-dot"></span>
+    <span id="sync-label">Conectando…</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('captura')">➕ Capturar</div>
+  <div class="tab" onclick="showTab('lista')">📋 Lista</div>
+</div>
+
+<!-- CAPTURA -->
+<div class="section active" id="tab-captura">
+  <div class="nombre-wrap">
+    <label>👤 Tu nombre:</label>
+    <input type="text" id="f-nombre" placeholder="Ej. Mamá / Papá" oninput="guardarNombre()">
+  </div>
+
+  <div class="field">
+    <label>Fecha</label>
+    <input type="date" id="f-fecha">
+  </div>
+  <div class="field">
+    <label>Tipo</label>
+    <div class="tipo-row">
+      <button class="tipo-btn" id="btn-ingreso" onclick="selectTipo('Ingreso')">💵 Ingreso</button>
+      <button class="tipo-btn" id="btn-gasto" onclick="selectTipo('Gasto')">💸 Gasto</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Categoría</label>
+    <select id="f-categoria" onchange="onCatChange()">
+      <option value="">Selecciona categoría…</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Concepto</label>
+    <select id="f-concepto">
+      <option value="">Selecciona concepto…</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Monto</label>
+    <input type="number" inputmode="decimal" id="f-monto" placeholder="0.00" min="0">
+  </div>
+  <button class="submit-btn" onclick="guardar()">Guardar movimiento</button>
+</div>
+
+<!-- LISTA -->
+<div class="section" id="tab-lista">
+  <div class="list-header">
+    <span class="list-count" id="list-count">Cargando…</span>
+    <button class="export-btn" onclick="exportar()" id="export-btn" disabled>⬇️ Exportar</button>
+  </div>
+  <div id="lista-container"></div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="showTab('captura')"><span class="icon">➕</span>Capturar</button>
+  <button class="nav-btn" onclick="showTab('lista')"><span class="icon">📋</span>Lista</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:16px;padding:24px 20px;width:100%;max-width:340px;">
+    <div style="font-size:32px;text-align:center;margin-bottom:12px;">🗑</div>
+    <p style="font-size:16px;font-weight:700;text-align:center;margin-bottom:8px;">¿Eliminar movimiento?</p>
+    <p style="font-size:13px;color:#666;text-align:center;margin-bottom:20px;">Esta acción no se puede deshacer.</p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cerrarConfirm()" style="flex:1;padding:13px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:15px;font-weight:600;background:white;cursor:pointer;">Cancelar</button>
+      <button onclick="confirmarEliminar()" style="flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;background:#c1121f;color:white;cursor:pointer;">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:flex-end;justify-content:center;">
+  <div style="background:#f4f3ef;border-radius:20px 20px 0 0;padding:20px 20px 40px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span style="font-size:16px;font-weight:800;">✏️ Editar movimiento</span>
+      <button onclick="cerrarEditar()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#aaa;">✕</button>
+    </div>
+    <div class="field"><label>Fecha</label><input type="date" id="ed-fecha"></div>
+    <div class="field">
+      <label>Tipo</label>
+      <div class="tipo-row">
+        <button class="tipo-btn" id="ed-btn-ingreso" onclick="selectTipoEdit('Ingreso')">💵 Ingreso</button>
+        <button class="tipo-btn" id="ed-btn-gasto" onclick="selectTipoEdit('Gasto')">💸 Gasto</button>
+      </div>
+    </div>
+    <div class="field"><label>Categoría</label><select id="ed-categoria" onchange="onCatChangeEdit()"><option value="">Selecciona categoría…</option></select></div>
+    <div class="field"><label>Concepto</label><select id="ed-concepto"><option value="">Selecciona concepto…</option></select></div>
+    <div class="field"><label>Monto</label><input type="number" inputmode="decimal" id="ed-monto" placeholder="0.00" min="0"></div>
+    <button class="submit-btn" onclick="guardarEdicion()">Guardar cambios</button>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div id="export-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:400;align-items:flex-end;justify-content:center;">
+  <div style="background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;max-width:500px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="font-size:16px;font-weight:800">Exportar movimientos</span>
+      <button onclick="cerrarExport()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#aaa;">✕</button>
+    </div>
+    <p style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.5;">Copia y pega en tu hoja <strong>MOVIMIENTOS</strong> de Excel.</p>
+    <textarea id="export-texto" readonly style="width:100%;height:160px;border:1.5px solid #e0e0e0;border-radius:10px;padding:12px;font-size:12px;font-family:monospace;resize:none;color:#333;background:#f9f9f9;"></textarea>
+    <button onclick="copiarTexto()" style="width:100%;margin-top:12px;padding:14px;background:#2d6a4f;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;">📋 Copiar todo</button>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBULwJ7fs5X5i7PoEzsTOOZI7QoTgRmhdI",
+  authDomain: "finanzas-mp.firebaseapp.com",
+  databaseURL: "https://finanzas-mp-default-rtdb.firebaseio.com",
+  projectId: "finanzas-mp",
+  storageBucket: "finanzas-mp.firebasestorage.app",
+  messagingSenderId: "52241900300",
+  appId: "1:52241900300:web:4da00314dc1d801387df29"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const movsRef = ref(db, 'movimientos');
+
+// ===== CATÁLOGOS =====
+const CATALOGO = {
+  Ingreso: {
+    'Nómina':     ['Salario','Bono','Préstamo','Utilidades','Aguinaldo','Caja de ahorro','Fondo de ahorro','Prima'],
+    'Acreedores': ['Emilio','Gustavo','Lola','Lucy'],
+  },
+  Gasto: {
+    'Apoyo':           ['Mamá'],
+    'Básicos':         ['Despensa1','Despensa2','Despensa3','Despensa4','Gasolina','Renta'],
+    'Deuda':           ['Pago TDC1','Pago TDC2','Pago TDC','Pago WM','Préstamo'],
+    'Entretenimiento': ['Ocio1','Ocio2','Ocio3','Ocio4','Six Flags','Xbox'],
+    'Escuela':         ['Colegiatura','Inscripción','Uniformes','Útiles'],
+    'Evento':          ['Cumpleaños','Muertos','Navidad','Quince sep'],
+    'Servicios':       ['Agua','Bait','Gas','Internet','Luz','Mitsubishi'],
+  }
+};
+
+// ===== ESTADO =====
+let movimientos = {};
+let tipoSeleccionado = '';
+let tipoEdit = '';
+let idAccion = null;
+
+// ===== NOMBRE =====
+function getNombre() { return localStorage.getItem('nombre_usuario') || ''; }
+window.guardarNombre = () => { localStorage.setItem('nombre_usuario', document.getElementById('f-nombre').value.trim()); };
+
+// ===== SYNC STATUS =====
+function setSyncStatus(estado) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  if (estado === 'online') { dot.className = 'sync-dot online'; label.textContent = 'Sincronizado'; }
+  else if (estado === 'syncing') { dot.className = 'sync-dot syncing'; label.textContent = 'Guardando…'; }
+  else { dot.className = 'sync-dot'; label.textContent = 'Sin conexión'; }
+}
+
+// ===== FIREBASE LISTENER =====
+onValue(movsRef, (snapshot) => {
+  movimientos = snapshot.val() || {};
+  setSyncStatus('online');
+  renderLista();
+}, (error) => {
+  setSyncStatus('offline');
+});
+
+// ===== TIPO =====
+window.selectTipo = (tipo) => {
+  tipoSeleccionado = tipo;
+  document.getElementById('btn-ingreso').className = 'tipo-btn' + (tipo === 'Ingreso' ? ' selected-ingreso' : '');
+  document.getElementById('btn-gasto').className   = 'tipo-btn' + (tipo === 'Gasto'   ? ' selected-gasto'   : '');
+  const sel = document.getElementById('f-categoria');
+  sel.innerHTML = '<option value="">Selecciona categoría…</option>';
+  Object.keys(CATALOGO[tipo]).forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
+  });
+  document.getElementById('f-concepto').innerHTML = '<option value="">Selecciona concepto…</option>';
+};
+
+window.onCatChange = () => {
+  const cat = document.getElementById('f-categoria').value;
+  const sel = document.getElementById('f-concepto');
+  sel.innerHTML = '<option value="">Selecciona concepto…</option>';
+  if (!cat || !tipoSeleccionado) return;
+  (CATALOGO[tipoSeleccionado][cat] || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c; sel.appendChild(opt);
+  });
+};
+
+// ===== GUARDAR =====
+window.guardar = async () => {
+  const fecha     = document.getElementById('f-fecha').value;
+  const tipo      = tipoSeleccionado;
+  const categoria = document.getElementById('f-categoria').value;
+  const concepto  = document.getElementById('f-concepto').value;
+  const monto     = parseFloat(document.getElementById('f-monto').value);
+  const nombre    = getNombre();
+
+  if (!fecha)     { showToast('⚠️ Falta la fecha'); return; }
+  if (!tipo)      { showToast('⚠️ Selecciona Ingreso o Gasto'); return; }
+  if (!categoria) { showToast('⚠️ Selecciona categoría'); return; }
+  if (!concepto)  { showToast('⚠️ Selecciona concepto'); return; }
+  if (!monto || monto <= 0) { showToast('⚠️ Ingresa un monto válido'); return; }
+
+  setSyncStatus('syncing');
+  try {
+    await push(movsRef, { fecha, tipo, categoria, concepto, monto, autor: nombre || 'Sin nombre', ts: Date.now() });
+    document.getElementById('f-categoria').innerHTML = '<option value="">Selecciona categoría…</option>';
+    document.getElementById('f-concepto').innerHTML  = '<option value="">Selecciona concepto…</option>';
+    document.getElementById('f-monto').value = '';
+    if (tipo) window.selectTipo(tipo);
+    showToast('✅ Movimiento guardado');
+  } catch(e) {
+    setSyncStatus('offline');
+    showToast('❌ Error al guardar');
+  }
+};
+
+// ===== LISTA =====
+function renderLista() {
+  const container = document.getElementById('lista-container');
+  const arr = Object.entries(movimientos).sort((a,b) => (b[1].ts||0) - (a[1].ts||0));
+  const count = arr.length;
+
+  document.getElementById('list-count').textContent = count + (count === 1 ? ' movimiento' : ' movimientos');
+  document.getElementById('export-btn').disabled = count === 0;
+
+  if (count === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>Aún no hay movimientos.<br>Ve a Capturar para agregar el primero.</p></div>`;
+    return;
+  }
+
+  container.innerHTML = arr.map(([key, m]) => {
+    const esIngreso = m.tipo === 'Ingreso';
+    const icon = esIngreso ? '💵' : '💸';
+    const montoFmt = '$' + m.monto.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const fecha = m.fecha ? new Date(m.fecha + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+    return `
+      <div class="mov-item">
+        <div class="mov-tipo-dot ${esIngreso ? 'dot-ingreso' : 'dot-gasto'}">${icon}</div>
+        <div class="mov-body">
+          <div class="mov-top">
+            <span class="mov-concepto">${m.concepto}</span>
+            <span class="mov-monto ${esIngreso ? 'ingreso' : 'gasto'}">${esIngreso ? '+' : '-'}${montoFmt}</span>
+          </div>
+          <div class="mov-meta">${fecha} · ${m.tipo} · ${m.categoria}</div>
+          ${m.autor ? `<div class="mov-autor">👤 ${m.autor}</div>` : ''}
+        </div>
+        <div class="action-btns">
+          <button class="action-btn" onclick="abrirEditar('${key}')">✏️</button>
+          <button class="action-btn" onclick="abrirEliminar('${key}')">🗑</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ===== ELIMINAR =====
+window.abrirEliminar = (key) => {
+  idAccion = key;
+  document.getElementById('confirm-modal').style.display = 'flex';
+};
+window.cerrarConfirm = () => {
+  document.getElementById('confirm-modal').style.display = 'none';
+  idAccion = null;
+};
+window.confirmarEliminar = async () => {
+  setSyncStatus('syncing');
+  try {
+    await remove(ref(db, `movimientos/${idAccion}`));
+    cerrarConfirm();
+    showToast('🗑 Eliminado');
+  } catch(e) {
+    setSyncStatus('offline');
+    showToast('❌ Error al eliminar');
+  }
+};
+
+// ===== EDITAR =====
+window.abrirEditar = (key) => {
+  const m = movimientos[key];
+  if (!m) return;
+  idAccion = key;
+  document.getElementById('ed-fecha').value = m.fecha;
+  window.selectTipoEdit(m.tipo);
+  document.getElementById('ed-categoria').value = m.categoria;
+  window.onCatChangeEdit();
+  document.getElementById('ed-concepto').value = m.concepto;
+  document.getElementById('ed-monto').value = m.monto;
+  document.getElementById('edit-modal').style.display = 'flex';
+};
+
+window.selectTipoEdit = (tipo) => {
+  tipoEdit = tipo;
+  document.getElementById('ed-btn-ingreso').className = 'tipo-btn' + (tipo === 'Ingreso' ? ' selected-ingreso' : '');
+  document.getElementById('ed-btn-gasto').className   = 'tipo-btn' + (tipo === 'Gasto'   ? ' selected-gasto'   : '');
+  const sel = document.getElementById('ed-categoria');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Selecciona categoría…</option>';
+  Object.keys(CATALOGO[tipo]).forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat; sel.appendChild(opt);
+  });
+  sel.value = cur;
+  document.getElementById('ed-concepto').innerHTML = '<option value="">Selecciona concepto…</option>';
+};
+
+window.onCatChangeEdit = () => {
+  const cat = document.getElementById('ed-categoria').value;
+  const cur = document.getElementById('ed-concepto').value;
+  const sel = document.getElementById('ed-concepto');
+  sel.innerHTML = '<option value="">Selecciona concepto…</option>';
+  if (!cat || !tipoEdit) return;
+  (CATALOGO[tipoEdit][cat] || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c; sel.appendChild(opt);
+  });
+  sel.value = cur;
+};
+
+window.guardarEdicion = async () => {
+  const fecha     = document.getElementById('ed-fecha').value;
+  const tipo      = tipoEdit;
+  const categoria = document.getElementById('ed-categoria').value;
+  const concepto  = document.getElementById('ed-concepto').value;
+  const monto     = parseFloat(document.getElementById('ed-monto').value);
+
+  if (!fecha || !tipo || !categoria || !concepto || !monto || monto <= 0) {
+    showToast('⚠️ Completa todos los campos'); return;
+  }
+  setSyncStatus('syncing');
+  try {
+    await update(ref(db, `movimientos/${idAccion}`), { fecha, tipo, categoria, concepto, monto });
+    cerrarEditar();
+    showToast('✅ Movimiento actualizado');
+  } catch(e) {
+    setSyncStatus('offline');
+    showToast('❌ Error al actualizar');
+  }
+};
+
+window.cerrarEditar = () => {
+  document.getElementById('edit-modal').style.display = 'none';
+  idAccion = null; tipoEdit = '';
+};
+
+// ===== EXPORT =====
+window.exportar = () => {
+  const arr = Object.values(movimientos).sort((a,b) => a.fecha.localeCompare(b.fecha));
+  const rows = arr.map(m => {
+    const [y,mo,d] = m.fecha.split('-');
+    return `${d}/${mo}/${y}\t${m.tipo}\t${m.categoria}\t${m.concepto}\t${m.monto}`;
+  });
+  document.getElementById('export-texto').value = rows.join('\n');
+  document.getElementById('export-modal').style.display = 'flex';
+};
+
+window.copiarTexto = () => {
+  const el = document.getElementById('export-texto');
+  el.select(); el.setSelectionRange(0, 99999);
+  try {
+    navigator.clipboard.writeText(el.value)
+      .then(() => showToast('✅ Copiado — pega en Excel con Ctrl+V'))
+      .catch(() => { document.execCommand('copy'); showToast('✅ Copiado — pega en Excel con Ctrl+V'); });
+  } catch(e) { document.execCommand('copy'); showToast('✅ Copiado — pega en Excel con Ctrl+V'); }
+};
+
+window.cerrarExport = () => { document.getElementById('export-modal').style.display = 'none'; };
+
+// ===== UI =====
+window.showTab = (name) => {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  const navs = document.querySelectorAll('.nav-btn');
+  if (name === 'captura') { tabs[0].classList.add('active'); navs[0].classList.add('active'); }
+  if (name === 'lista')   { tabs[1].classList.add('active'); navs[1].classList.add('active'); }
+};
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+window.showToast = showToast;
+
+// ===== INIT =====
+const hoy = new Date().toISOString().split('T')[0];
+document.getElementById('f-fecha').value = hoy;
+const nombre = getNombre();
+if (nombre) document.getElementById('f-nombre').value = nombre;
+</script>
+</body>
+</html>
